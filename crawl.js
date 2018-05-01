@@ -1,5 +1,16 @@
 const DIR = `${__dirname}/imdb_frames`
-const STATUS_FILE = `${DIR}/status.txt`
+const STATUS_FILE = `${__dirname}/status.json`
+
+let status = require(STATUS_FILE)
+
+const fs = require('fs')
+const fname = (url) => {
+  let a = url.split('/').filter(s => s.length > 0)
+  return a[a.length - 1]
+}
+setInterval(() => {
+  fs.writeFile(STATUS_FILE, JSON.stringify(status), () => {})
+}, 1000)
 
 Array.prototype.unique = function() {
   return this.filter(function (value, index, self) { 
@@ -22,10 +33,6 @@ const worker = async (imdb_id) => { //tt0317248
   const pageContent = await page.content()
   const posters = pageContent.match(posterMatcher).map(u => u.split('_V1_')[0] + '_V1_.jpg')
 
-  const fname = (url) => {
-    let a = url.split('/')
-    return a[a.length - 1]
-  }
 
   await command.open(DIR).exec('mkdir', [imdb_id])
   const DownloadPromiseGenerator = (posterUrl) => wget(posterUrl, { output: `${DIR}/${imdb_id}/${fname(posterUrl)}` })
@@ -34,5 +41,24 @@ const worker = async (imdb_id) => { //tt0317248
 }
 
 (async () => {
-  await worker('tt0317248')
+  infiniteWorker = (id) => {
+    console.log(`${id} running`)
+    const task = status.filter(x => !x.done && !x.working).pop()
+    if (!task)
+      return Promise.resolve('done')
+    else {
+      task.working = true
+      return worker(fname(task.link)).then(() => {
+        status.find(x => x === task).done = true
+        return infiniteWorker(id)
+      })
+    }
+  }
+  await Promise.all([
+    infiniteWorker('Alice'),
+    infiniteWorker('Bob'),
+    infiniteWorker('Mutant'),
+    infiniteWorker('Minion'),
+    infiniteWorker('Puppy'),
+  ])
 })()
