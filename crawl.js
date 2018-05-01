@@ -1,13 +1,20 @@
 const DIR = `${__dirname}/imdb_frames`
 const STATUS_FILE = `${__dirname}/status.json`
 
-let status = require(STATUS_FILE)
-
-const fs = require('fs')
 const fname = (url) => {
   let a = url.split('/').filter(s => s.length > 0)
   return a[a.length - 1]
 }
+
+let status = require(STATUS_FILE).map(x => {
+  if (x.working && !x.done) {
+    console.log(`Recovering ${fname(x.link)}`)
+    x.working = null
+  }
+  return x
+})
+
+const fs = require('fs')
 setInterval(() => {
   fs.writeFile(STATUS_FILE, JSON.stringify(status), () => {})
 }, 1000)
@@ -44,8 +51,10 @@ const worker = async (imdb_id) => { //tt0317248
   infiniteWorker = (id) => {
     console.log(`${id} running`)
     const task = status.filter(x => !x.done && !x.working).pop()
-    if (!task)
+    if (!task) {
+      console.log('done')
       return Promise.resolve('done')
+    }
     else {
       task.working = true
       return worker(fname(task.link)).then(() => {
